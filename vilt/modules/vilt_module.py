@@ -222,14 +222,14 @@ class ViLTransformerSS(pl.LightningModule):
 
         return total_loss
 
-    def training_epoch_end(self, outs):
+    def on_train_epoch_end(self):
         vilt_utils.epoch_wrapup(self)
 
     def validation_step(self, batch, batch_idx):
         vilt_utils.set_task(self)
         output = self(batch)
 
-    def validation_epoch_end(self, outs):
+    def on_validation_epoch_end(self):
         vilt_utils.epoch_wrapup(self)
 
     def test_step(self, batch, batch_idx):
@@ -242,11 +242,13 @@ class ViLTransformerSS(pl.LightningModule):
 
         return ret
 
-    def test_epoch_end(self, outs):
+    def on_test_epoch_end(self):
         model_name = self.hparams.config["load_path"].split("/")[-1][:-5]
 
-        if self.hparams.config["loss_names"]["vqa"] > 0:
-            objectives.vqa_test_wrapup(outs, model_name)
+        # TODO: should be re-enabled but we don't care about the vqa downstream task
+        # thus, we keep this code disabled until we figure out how to get `outs`.
+        # if self.hparams.config["loss_names"]["vqa"] > 0:
+        #     objectives.vqa_test_wrapup(outs, model_name)
         vilt_utils.epoch_wrapup(self)
 
     def configure_optimizers(self):

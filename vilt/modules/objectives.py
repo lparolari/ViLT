@@ -460,7 +460,8 @@ def compute_irtr_recall(pl_module):
         image_only=True
     )
     image_dset.tokenizer = pl_module.trainer.datamodule.dms[0].tokenizer
-    dist_sampler = DistributedSampler(image_dset, shuffle=False)
+    # TODO: use the distributed sampler when ddp is enabled
+    dist_sampler = None #DistributedSampler(image_dset, shuffle=False)
     image_loader = torch.utils.data.DataLoader(
         image_dset,
         batch_size=1,
