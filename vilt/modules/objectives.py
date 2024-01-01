@@ -531,9 +531,10 @@ def compute_irtr_recall(pl_module):
         rank_scores.append(img_batch_score.cpu().tolist())
         rank_iids.append(_iid)
 
-    torch.distributed.barrier()
-    gather_rank_scores = all_gather(rank_scores)
-    gather_rank_iids = all_gather(rank_iids)
+    # TODO: execute distributed con conditionally (when ddp is enabled)
+    #torch.distributed.barrier()
+    gather_rank_scores = rank_scores  #gather_rank_scores = all_gather(rank_scores)
+    gather_rank_iids = rank_iids  # gather_rank_iids = all_gather(rank_iids)
 
     iids = torch.tensor(gather_rank_iids)
     iids = iids.view(-1)
