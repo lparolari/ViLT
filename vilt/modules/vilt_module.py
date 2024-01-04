@@ -97,6 +97,17 @@ class ViLTransformerSS(pl.LightningModule):
             for p in self.itm_score.parameters():
                 p.requires_grad = False
 
+        if self.hparams.config["loss_names"]["rec"] > 0:
+            self.rec_output = heads.RECHead(
+                input_dim=config["hidden_size"],
+                hidden_dim=config["hidden_size"],  # TODO: verify
+                output_dim=4
+            )
+            # TODO: properly init weights
+            # TODO: keep the following?
+            for p in self.itm_score.parameters():
+                p.requires_grad = False
+
         vilt_utils.set_metrics(self)
         self.current_tasks = list()
 
@@ -212,6 +223,9 @@ class ViLTransformerSS(pl.LightningModule):
         # Image Retrieval and Text Retrieval
         if "irtr" in self.current_tasks:
             ret.update(objectives.compute_irtr(self, batch))
+        
+        if "rec" in self.current_tasks:
+            ret.update(objectives.compute_rec(self, batch))
 
         return ret
 

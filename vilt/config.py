@@ -11,6 +11,7 @@ def _loss_names(d):
         "vqa": 0,
         "nlvr2": 0,
         "irtr": 0,
+        "rec": 0,
     }
     ret.update(d)
     return ret
@@ -235,6 +236,22 @@ def task_finetune_irtr_f30k_randaug():
     warmup_steps = 0.1
     get_recall_metric = True
     draw_false_text = 15
+    learning_rate = 1e-4
+
+
+@ex.named_config
+def task_finetune_rec_f30k_randaug():
+    exp_name = "finetune_rec_f30k_randaug"
+    datasets = ["f30k"]
+    train_transform_keys = ["pixelbert_randaug"]
+    loss_names = _loss_names({"itm": 0.5, "rec": 1})
+    batch_size = 256
+    max_epoch = 10
+    max_steps = None
+    warmup_steps = 0.1
+    get_recall_metric = False
+    draw_false_image = 0
+    draw_false_text = 0
     learning_rate = 1e-4
 
 

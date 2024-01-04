@@ -87,7 +87,10 @@ class BaseDataset(torch.utils.data.Dataset):
 
     def get_raw_image(self, index, image_key="image"):
         index, caption_index = self.index_mapper[index]
-        image_bytes = io.BytesIO(self.table[image_key][index].as_py())
+        # image_bytes = io.BytesIO(self.table[image_key][index].as_py())
+        data_root = "data/flickr30k-images"
+        with open(data_root + "/" + self.table[image_key][index].as_py(), "rb") as f:
+            image_bytes = io.BytesIO(f.read())
         image_bytes.seek(0)
         return Image.open(image_bytes).convert("RGB")
 
@@ -144,6 +147,7 @@ class BaseDataset(torch.utils.data.Dataset):
             try:
                 ret = dict()
                 ret.update(self.get_image(index))
+                ret.update({"target_boxes": torch.tensor(self.table["box"][self.index_mapper[index][0]].as_py())})
                 if not self.image_only:
                     txt = self.get_text(index)
                     ret.update({"replica": True if txt["cap_index"] > 0 else False})
@@ -236,5 +240,7 @@ class BaseDataset(torch.utils.data.Dataset):
                 dict_batch[f"{txt_key}_ids_mlm"] = mlm_ids
                 dict_batch[f"{txt_key}_labels_mlm"] = mlm_labels
                 dict_batch[f"{txt_key}_masks"] = attention_mask
+
+        dict_batch["target_boxes"] = torch.stack(dict_batch["target_boxes"])
 
         return dict_batch

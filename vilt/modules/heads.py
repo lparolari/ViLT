@@ -53,3 +53,17 @@ class MPPHead(nn.Module):
         x = self.transform(x)
         x = self.decoder(x)
         return x
+
+
+class RECHead(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super().__init__()
+        self.num_layers = 3
+
+        h = [hidden_dim] * (self.num_layers - 1)
+        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x

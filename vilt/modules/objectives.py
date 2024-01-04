@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 import os
 import glob
 import json
@@ -441,6 +442,33 @@ def compute_irtr(pl_module, batch):
     return ret
 
 
+def compute_rec(pl_module, batch):
+    infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+    pred_box = pl_module.rec_output(infer["cls_feats"]).sigmoid()
+    target_box = batch["target_boxes"]
+    
+    rec_loss = trans_vg_loss(
+        pred_box, 
+        torchvision.ops.box_convert(target_box, "xywh", "cxcywh")
+    )
+
+    ret = {
+        "rec_loss": rec_loss,
+    }
+
+    phase = "train" if pl_module.training else "val"
+    loss = getattr(pl_module, f"{phase}_rec_loss")(ret["rec_loss"])
+    acc = getattr(pl_module, f"{phase}_rec_accuracy")(1.0)
+    # TODO: enable accuracy
+    # acc = getattr(pl_module, f"{phase}_rec_accuracy")(
+    #     # ret["mlm_logits"], ret["mlm_labels"]
+    # )
+    pl_module.log(f"rec/{phase}/loss", loss)
+    pl_module.log(f"rec/{phase}/accuracy", acc)
+
+    return ret
+
+
 @torch.no_grad()
 def compute_irtr_recall(pl_module):
     text_dset = pl_module.trainer.datamodule.dms[0].make_no_false_val_dset()
@@ -652,3 +680,80 @@ def arc_test_wrapup(outs, caplen, model_name):
 
     torch.distributed.barrier()
     os.remove(f"coco_cap_len{caplen}_{rank}.json")
+
+# TODO: move to file?
+
+
+def cxcywh2xyxy(x):
+    x_c, y_c, w, h = x.unbind(-1)
+    b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
+         (x_c + 0.5 * w), (y_c + 0.5 * h)]
+    return torch.stack(b, dim=-1)
+
+from torchvision.ops.boxes import box_area
+
+def box_iou(boxes1, boxes2):
+    area1 = box_area(boxes1)
+    area2 = box_area(boxes2)
+
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+
+    wh = (rb - lt).clamp(min=0)  # [N,M,2]
+    inter = wh[:, :, 0] * wh[:, :, 1]  # [N,M]
+
+    union = area1[:, None] + area2 - inter
+
+    iou = inter / union
+    return iou, union
+
+
+def generalized_box_iou(boxes1, boxes2):
+    """
+    Generalized IoU from https://giou.stanford.edu/
+
+    The boxes should be in [x0, y0, x1, y1] format
+
+    Returns a [N, M] pairwise matrix, where N = len(boxes1)
+    and M = len(boxes2)
+    """
+    # degenerate boxes gives inf / nan results
+    # so do an early check
+    assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+    assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
+    iou, union = box_iou(boxes1, boxes2)
+
+    lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
+    rb = torch.max(boxes1[:, None, 2:], boxes2[:, 2:])
+
+    wh = (rb - lt).clamp(min=0)  # [N,M,2]
+    area = wh[:, :, 0] * wh[:, :, 1]
+
+    return iou - (area - union) / area
+
+
+def trans_vg_loss(batch_pred, batch_target):
+    """Compute the losses related to the bounding boxes, 
+       including the L1 regression loss and the GIoU loss
+    """
+    batch_size = batch_pred.shape[0]
+    # world_size = get_world_size()
+    num_boxes = batch_size
+
+    loss_bbox = F.l1_loss(batch_pred, batch_target, reduction='none')
+    loss_giou = 1 - torch.diag(generalized_box_iou(
+        cxcywh2xyxy(batch_pred),
+        cxcywh2xyxy(batch_target)
+    ))
+
+    loss_bbox = loss_bbox.sum() / num_boxes
+    loss_giou = loss_giou.sum() / num_boxes
+    
+    lam = 1. 
+
+    # transvg implementation returns the two losses and the reduces 
+    # them in the client code. here, on the countrary, we reduce them
+    # following the [paper](https://doi.org/10.1007/s00521-021-06496-4)
+    # we set lambda to 1
+
+    return loss_bbox + lam * loss_giou
