@@ -458,11 +458,17 @@ def compute_rec(pl_module, batch):
 
     phase = "train" if pl_module.training else "val"
     loss = getattr(pl_module, f"{phase}_rec_loss")(ret["rec_loss"])
-    acc = getattr(pl_module, f"{phase}_rec_accuracy")(1.0)
-    # TODO: enable accuracy
-    # acc = getattr(pl_module, f"{phase}_rec_accuracy")(
-    #     # ret["mlm_logits"], ret["mlm_labels"]
-    # )
+
+    # TODO: add the proper metric class and move there the computation
+    pred_box_xyxy = torchvision.ops.box_convert(pred_box, "cxcywh", "xyxy")
+    target_box_xyxy = torchvision.ops.box_convert(target_box, "xywh", "xyxy")
+    iou = torchvision.ops.box_iou(pred_box_xyxy, target_box_xyxy)
+    iou = iou.max(dim=-1)[0]
+    acc = (iou > 0.5).float().mean()
+
+    acc = getattr(pl_module, f"{phase}_rec_accuracy")(
+        acc
+    )
     pl_module.log(f"rec/{phase}/loss", loss)
     pl_module.log(f"rec/{phase}/accuracy", acc)
 
