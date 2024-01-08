@@ -64,6 +64,7 @@ def config():
 
     # Downstream Setting
     get_recall_metric = False
+    rec_use_raw_feats = False
 
     # PL Trainer Setting
     resume_from = None

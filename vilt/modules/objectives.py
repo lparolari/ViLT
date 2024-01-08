@@ -443,8 +443,15 @@ def compute_irtr(pl_module, batch):
 
 
 def compute_rec(pl_module, batch):
+    rec_use_raw_feats = pl_module.hparams.config.get("rec_use_raw_feats", False)
+
+    if rec_use_raw_feats:
+        rec_input_key = "raw_cls_feats"  # transformer raw feats
+    else:
+        rec_input_key = "cls_feats"  # pooler
+
     infer = pl_module.infer(batch, mask_text=False, mask_image=False)
-    pred_box = pl_module.rec_output(infer["cls_feats"]).sigmoid()
+    pred_box = pl_module.rec_output(infer[rec_input_key]).sigmoid()
     target_box = batch["target_boxes"]
     
     rec_loss = trans_vg_loss(
