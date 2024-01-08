@@ -464,7 +464,7 @@ def compute_rec(pl_module, batch):
     target_box_xyxy = torchvision.ops.box_convert(target_box, "xywh", "xyxy")
     iou = torchvision.ops.box_iou(pred_box_xyxy, target_box_xyxy)
     iou = iou.max(dim=-1)[0]
-    acc = (iou > 0.5).float().mean()
+    acc = (iou >= 0.5).float().mean()
 
     acc = getattr(pl_module, f"{phase}_rec_accuracy")(
         acc
