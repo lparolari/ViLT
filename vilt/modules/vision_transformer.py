@@ -910,6 +910,7 @@ def _create_vision_transformer(variant, pretrained=False, distilled=False, **kwa
     if pretrained:
         load_pretrained(
             model,
+            pretrained_cfg=default_cfg,
             num_classes=num_classes,
             in_chans=kwargs.get("in_chans", 3),
             filter_fn=partial(checkpoint_filter_fn, model=model),
