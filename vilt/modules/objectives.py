@@ -469,9 +469,18 @@ def compute_rec(pl_module, batch):
     # TODO: add the proper metric class and move there the computation
     pred_box_xyxy = torchvision.ops.box_convert(pred_box, "cxcywh", "xyxy")
     target_box_xyxy = torchvision.ops.box_convert(target_box, "xywh", "xyxy")
-    iou = torchvision.ops.box_iou(pred_box_xyxy, target_box_xyxy)
-    iou = iou.max(dim=-1)[0]
-    acc = (iou >= 0.5).float().mean()
+
+    b = pred_box.shape[0]
+
+    scores = torchvision.ops.box_iou(pred_box_xyxy, target_box_xyxy)  # [b, b]
+
+    index = torch.arange(b).to(pred_box.device).unsqueeze(-1)  # [b, 1]
+
+    scores = scores.gather(-1, index)  # [b, 1]
+    scores = scores.squeeze(-1)  # [b]
+
+    matches = scores >= 0.5  # [b]
+    acc = matches.float().mean()
 
     acc = getattr(pl_module, f"{phase}_rec_accuracy")(
         acc
