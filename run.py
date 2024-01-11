@@ -25,9 +25,10 @@ def main(_config):
         mode="max",
         save_last=True,
     )
-    logger = pl.loggers.TensorBoardLogger(
-        _config["log_dir"],
+    logger = pl.loggers.WandbLogger(
         name=f'{exp_name}_seed{_config["seed"]}_from_{_config["load_path"].split("/")[-1][:-5]}',
+        save_dir=_config["log_dir"],
+        project="ViLT",
     )
 
     lr_callback = pl.callbacks.LearningRateMonitor(logging_interval="step")
