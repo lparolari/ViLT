@@ -245,7 +245,7 @@ def task_finetune_rec_f30k_randaug():
     exp_name = "finetune_rec_f30k_randaug"
     datasets = ["f30k"]
     train_transform_keys = ["pixelbert_randaug"]
-    loss_names = _loss_names({"itm": 0.5, "rec": 1})
+    loss_names = _loss_names({"rec": 1})
     batch_size = 256
     max_epoch = 10
     max_steps = None
